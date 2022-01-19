@@ -28,11 +28,20 @@ struct FixedAsset{
     /*****************************************
      * 年間の償却金額
      *
-     * 小数点以下は四捨五入
+     * 小数点以下は切り上げ
+     * See_Also:
+     * 国税庁[https://www.keisan.nta.go.jp/h29yokuaru/aoiroshinkoku/hitsuyokeihi/genkashokyakuhi/hasushori.html]
      *****************************************/
-    uint priceDeprecBasic(){
-      import std.math: round;
-      return cast(uint)(round(cast(double)(_priceInit)/_economicLife));
+    T priceDeprecBasic(T= uint)(){
+      import std.traits: isFloatingPoint;
+      const double result= cast(double)(_priceInit)/_economicLife;
+      static if(isFloatingPoint!T){
+	return cast(T)result;
+      }
+      else{
+	import std.math: ceil;
+	return cast(T)(ceil(result));
+      }
     }
 
     /*****************************************
@@ -85,7 +94,7 @@ struct FixedAsset{
      * 資産額
      *****************************************/
     uint assetValue(in uint year, in Month month= Month.dec){
-      import std.math: round;
+      import std.math: ceil;
       const Date theDay= Date(year, month, daysOfMonth(year, month));
       double result;
 
@@ -103,8 +112,7 @@ struct FixedAsset{
 	if(isInDeprecPeriod(year, month)){
 	  const uint durInMonth= theDay.year-acquisitionDateNominal.year
 	    +theDay.month-acquisitionDateNominal.month+1;
-	  double price= _priceInit-cast(double)priceDeprecBasic/12*durInMonth;
-	  price= round(price);
+	  double price= _priceInit -ceil(priceDeprecBasic!double/12*durInMonth);
 	}
 	else{
 	  result= 1;	// 備忘価格
@@ -126,8 +134,8 @@ struct FixedAsset{
 	  else result= assetValue(year-1)-assetValue(year);
 	}
 	else{
-	  import std.math: round;
-	  return cast(typeof(return))round(priceDeprecBasic/12.0);
+	  import std.math: ceil;
+	  return cast(typeof(return))ceil(priceDeprecBasic!double/12);
 	}
       }
       else{
@@ -145,9 +153,9 @@ private:
 
   @safe pure nothrow @nogc{
     uint priceDeprecFirst() const{
-      import std.math: round;
-      const double validRate= cast(double)(remainMonthOfFirstYear)/12.0;
-      return cast(typeof(return))round(validRate*this.priceDeprecBasic);
+      import std.math: ceil;
+      const double validRate= cast(double)(remainMonthOfFirstYear)/12;
+      return cast(typeof(return))ceil(validRate*this.priceDeprecBasic!double);
     }
 
     uint daysOfMonth(in uint year, in Month month) const{
